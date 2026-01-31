@@ -21,6 +21,17 @@ import BlacklistDetail from "./pages/BlacklistDetail";
 import DeliveryReportsPage from "./pages/reports/DeliveryReportsPage";
 import OperatorPerformancePage from "./pages/reports/OperatorPerformancePage";
 import CostReportsPage from "./pages/reports/CostReportsPage";
+// Audit & Compliance
+import AuditLogsPage from "./pages/audit/AuditLogsPage";
+import SLAStatusPage from "./pages/audit/SLAStatusPage";
+// Users & Roles
+import UserListPage from "./pages/users/UserListPage";
+import UserFormPage from "./pages/users/UserFormPage";
+import RolesPage from "./pages/users/RolesPage";
+// System Settings
+import SenderIDPage from "./pages/settings/SenderIDPage";
+import APIWebhooksPage from "./pages/settings/APIWebhooksPage";
+import RoutingRulesPage from "./pages/settings/RoutingRulesPage";
 
 const queryClient = new QueryClient();
 
@@ -48,8 +59,20 @@ const App = () => (
           <Route path="/contacts/blacklist/:id" element={<BlacklistDetail />} />
           {/* Reports Routes */}
           <Route path="/reports/delivery" element={<DeliveryReportsPage />} />
-          <Route path="/reports/operator-performance" element={<OperatorPerformancePage />} />
-          <Route path="/reports/cost" element={<CostReportsPage />} />
+          <Route path="/reports/operators" element={<OperatorPerformancePage />} />
+          <Route path="/reports/costs" element={<CostReportsPage />} />
+          {/* Audit & Compliance Routes */}
+          <Route path="/audit/logs" element={<AuditLogsPage />} />
+          <Route path="/audit/sla" element={<SLAStatusPage />} />
+          {/* Users & Roles Routes */}
+          <Route path="/users/list" element={<UserListPage />} />
+          <Route path="/users/list/new" element={<UserFormPage />} />
+          <Route path="/users/list/:id" element={<UserFormPage />} />
+          <Route path="/users/roles" element={<RolesPage />} />
+          {/* System Settings Routes */}
+          <Route path="/settings/sender-ids" element={<SenderIDPage />} />
+          <Route path="/settings/api" element={<APIWebhooksPage />} />
+          <Route path="/settings/routing" element={<RoutingRulesPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
