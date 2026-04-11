@@ -155,7 +155,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetchCampaigns(page, pageSize);
+      const data = await apiFetchCampaigns({ page, pageSize });
       setCampaigns(data.results.map(mapApiCampaign));
       setTotalCount(data.count);
     } catch (e: any) {
