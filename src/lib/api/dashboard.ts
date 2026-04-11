@@ -1,4 +1,6 @@
-import { API_BASE, authFetch, authHeaders, handleResponse } from "./base";
+import { authFetch, authHeaders, handleResponse } from "./base";
+
+const API_BASE_LOCAL = (import.meta.env.VITE_API_BASE_URL || "https://django-app-v6.onrender.com").replace(/\/+$/, "");
 
 export interface DashboardSummary {
   total_campaigns: number;
@@ -21,6 +23,6 @@ export interface DashboardSummary {
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
-  const res = await authFetch(`${API_BASE}/api/campaigns/summary/`, { headers: authHeaders() });
+  const res = await authFetch(`${API_BASE_LOCAL}/api/campaigns/summary/`, { headers: authHeaders() });
   return handleResponse<DashboardSummary>(res);
 }

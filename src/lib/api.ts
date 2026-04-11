@@ -121,8 +121,23 @@ export interface ApiCampaign {
   is_deleted: boolean;
 }
 
-export async function fetchCampaigns(page = 1, pageSize = 10) {
-  const res = await authFetch(`${API_BASE_LOCAL}/api/campaigns/?page=${page}&page_size=${pageSize}`, {
+export interface FetchCampaignsParams {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  execution_status?: string;
+  search?: string;
+  ordering?: string;
+}
+
+export async function fetchCampaigns(params: FetchCampaignsParams = {}) {
+  const { page = 1, pageSize = 10, status, execution_status, search, ordering } = params;
+  const qp = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (status) qp.set("status", status);
+  if (execution_status) qp.set("execution_status", execution_status);
+  if (search) qp.set("search", search);
+  if (ordering) qp.set("ordering", ordering);
+  const res = await authFetch(`${API_BASE_LOCAL}/api/campaigns/?${qp.toString()}`, {
     headers: authHeaders(),
   });
   return handleResponse<import("./api/base").PaginatedResponse<ApiCampaign>>(res);

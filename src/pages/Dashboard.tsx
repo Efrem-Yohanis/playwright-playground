@@ -41,7 +41,7 @@ export default function Dashboard() {
 
   const { data: activeCampaigns, isLoading: activeLoading } = useQuery({
     queryKey: ["campaigns-active"],
-    queryFn: () => fetchCampaigns(1, 5),
+    queryFn: () => fetchCampaigns({ page: 1, pageSize: 5 }),
     select: (data) => data.results.filter((c: ApiCampaign) => c.status === "active" || c.execution_status === "running"),
     refetchInterval: 15000,
   });
