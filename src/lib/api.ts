@@ -6,6 +6,7 @@ export type { PaginatedResponse } from "./api/base";
 export * from "./api/audiences";
 export * from "./api/schedules";
 export * from "./api/messages";
+export * from "./api/dashboard";
 
 const API_BASE_LOCAL = (import.meta.env.VITE_API_BASE_URL || "https://django-app-v6.onrender.com").replace(/\/+$/, "");
 
