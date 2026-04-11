@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchCampaigns, type ApiCampaign } from "@/lib/api";
+import { fetchCampaigns, deleteCampaignApi, startCampaign, pauseCampaign, stopCampaign, type ApiCampaign } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +17,10 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus, Search, Eye, Pencil, Trash2, ChevronLeft, ChevronRight,
-  Play, Pause, Square, CheckCircle2, Clock, ArrowUpDown,
+  Play, Pause, Square, Clock, ArrowUpDown,
 } from "lucide-react";
-import { deleteCampaignApi } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -39,14 +39,31 @@ const EXEC_STYLES: Record<string, string> = {
   STOPPED: "bg-muted text-muted-foreground",
 };
 
+type ActionType = "start" | "pause" | "stop" | "delete";
+
+interface PendingAction {
+  type: ActionType;
+  campaignId: number;
+  campaignName: string;
+}
+
+const ACTION_CONFIG: Record<ActionType, { title: string; description: string; buttonLabel: string; destructive: boolean }> = {
+  start: { title: "Start campaign", description: "This will begin sending messages to all recipients.", buttonLabel: "Start", destructive: false },
+  pause: { title: "Pause campaign", description: "This will temporarily pause message delivery. You can resume later.", buttonLabel: "Pause", destructive: false },
+  stop: { title: "Stop campaign", description: "This will permanently stop the campaign. This action cannot be undone.", buttonLabel: "Stop", destructive: true },
+  delete: { title: "Delete campaign", description: "This action cannot be undone. The campaign will be permanently removed.", buttonLabel: "Delete", destructive: true },
+};
+
 export default function CampaignList() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [execFilter, setExecFilter] = useState<string>("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [ordering, setOrdering] = useState("-created_at");
-  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -55,11 +72,12 @@ export default function CampaignList() {
   }, [searchInput]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["campaigns", page, pageSize, statusFilter, search, ordering],
+    queryKey: ["campaigns", page, pageSize, statusFilter, execFilter, search, ordering],
     queryFn: () => fetchCampaigns({
       page,
       pageSize,
       status: statusFilter !== "all" ? statusFilter : undefined,
+      execution_status: execFilter !== "all" ? execFilter : undefined,
       search: search || undefined,
       ordering,
     }),
@@ -70,17 +88,43 @@ export default function CampaignList() {
   const totalCount = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  const handleDelete = useCallback(async () => {
-    if (!deleteId) return;
-    try { await deleteCampaignApi(deleteId); } catch {}
-    setDeleteId(null);
-    refetch();
-  }, [deleteId, refetch]);
+  const handleConfirmAction = useCallback(async () => {
+    if (!pendingAction) return;
+    setActionLoading(true);
+    try {
+      switch (pendingAction.type) {
+        case "start":
+          await startCampaign(pendingAction.campaignId);
+          toast.success(`Campaign "${pendingAction.campaignName}" started`);
+          break;
+        case "pause":
+          await pauseCampaign(pendingAction.campaignId);
+          toast.success(`Campaign "${pendingAction.campaignName}" paused`);
+          break;
+        case "stop":
+          await stopCampaign(pendingAction.campaignId);
+          toast.success(`Campaign "${pendingAction.campaignName}" stopped`);
+          break;
+        case "delete":
+          await deleteCampaignApi(pendingAction.campaignId);
+          toast.success(`Campaign "${pendingAction.campaignName}" deleted`);
+          break;
+      }
+      refetch();
+    } catch (e: any) {
+      toast.error(e.message || `Failed to ${pendingAction.type} campaign`);
+    } finally {
+      setActionLoading(false);
+      setPendingAction(null);
+    }
+  }, [pendingAction, refetch]);
 
   const toggleOrdering = (field: string) => {
     setOrdering((prev) => prev === field ? `-${field}` : prev === `-${field}` ? field : `-${field}`);
     setPage(1);
   };
+
+  const actionConfig = pendingAction ? ACTION_CONFIG[pendingAction.type] : null;
 
   return (
     <div className="space-y-6">
@@ -113,7 +157,7 @@ export default function CampaignList() {
         </div>
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
           <SelectTrigger className="w-40">
-            <SelectValue />
+            <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
@@ -122,6 +166,20 @@ export default function CampaignList() {
             <SelectItem value="paused">Paused</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={execFilter} onValueChange={(v) => { setExecFilter(v); setPage(1); }}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Execution status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All execution</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
+            <SelectItem value="PROCESSING">Processing</SelectItem>
+            <SelectItem value="COMPLETED">Completed</SelectItem>
+            <SelectItem value="FAILED">Failed</SelectItem>
+            <SelectItem value="PAUSED">Paused</SelectItem>
+            <SelectItem value="STOPPED">Stopped</SelectItem>
           </SelectContent>
         </Select>
         <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
@@ -177,7 +235,7 @@ export default function CampaignList() {
                   <th className="text-left px-5 py-3.5 font-medium text-muted-foreground text-xs uppercase tracking-wider min-w-[180px]">Progress</th>
                   <SortableHeader label="Created" field="created_at" current={ordering} onToggle={toggleOrdering} />
                   <th className="text-left px-5 py-3.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">Next Run</th>
-                  <th className="text-left px-5 py-3.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">Readiness</th>
+                  <th className="text-left px-5 py-3.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">Ready</th>
                   <th className="text-right px-5 py-3.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -190,7 +248,7 @@ export default function CampaignList() {
                   </tr>
                 )}
                 {campaigns.map((c) => (
-                  <CampaignRow key={c.id} campaign={c} onDelete={setDeleteId} />
+                  <CampaignRow key={c.id} campaign={c} onAction={setPendingAction} />
                 ))}
               </tbody>
             </table>
@@ -215,22 +273,29 @@ export default function CampaignList() {
         </div>
       )}
 
-      {/* Delete dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+      {/* Confirmation dialog for all actions */}
+      <AlertDialog open={!!pendingAction} onOpenChange={() => setPendingAction(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete campaign</AlertDialogTitle>
+            <AlertDialogTitle>{actionConfig?.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. The campaign will be permanently removed.
+              {pendingAction && (
+                <>
+                  <span className="font-medium text-foreground">{pendingAction.campaignName}</span>
+                  <br />
+                  {actionConfig?.description}
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={handleDelete}
+              className={actionConfig?.destructive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              onClick={handleConfirmAction}
+              disabled={actionLoading}
             >
-              Delete
+              {actionLoading ? "Processing..." : actionConfig?.buttonLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -256,7 +321,7 @@ function SortableHeader({ label, field, current, onToggle }: {
   );
 }
 
-function CampaignRow({ campaign: c, onDelete }: { campaign: ApiCampaign; onDelete: (id: number) => void }) {
+function CampaignRow({ campaign: c, onAction }: { campaign: ApiCampaign; onAction: (a: PendingAction) => void }) {
   const channels = Array.isArray(c.channels) ? c.channels : Object.values(c.channels || {});
   const progressPercent = (c as any).progress_percent ?? 0;
   const totalMessages = (c as any).total_messages ?? 0;
@@ -265,6 +330,10 @@ function CampaignRow({ campaign: c, onDelete }: { campaign: ApiCampaign; onDelet
   const hasSchedule = (c as any).has_schedule;
   const hasAudience = (c as any).has_audience;
   const hasContent = (c as any).has_content;
+
+  const triggerAction = (type: ActionType) => {
+    onAction({ type, campaignId: c.id, campaignName: c.name });
+  };
 
   return (
     <tr className="border-b last:border-b-0 hover:bg-accent/50 transition-colors">
@@ -331,15 +400,21 @@ function CampaignRow({ campaign: c, onDelete }: { campaign: ApiCampaign; onDelet
             <Button variant="ghost" size="icon" className="h-8 w-8"><Pencil className="h-3.5 w-3.5" /></Button>
           </Link>
           {c.can_start && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600"><Play className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700" onClick={() => triggerAction("start")} title="Start">
+              <Play className="h-3.5 w-3.5" />
+            </Button>
           )}
           {c.can_pause && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600"><Pause className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:text-amber-700" onClick={() => triggerAction("pause")} title="Pause">
+              <Pause className="h-3.5 w-3.5" />
+            </Button>
           )}
           {c.can_stop && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Square className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => triggerAction("stop")} title="Stop">
+              <Square className="h-3.5 w-3.5" />
+            </Button>
           )}
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(c.id)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => triggerAction("delete")} title="Delete">
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
