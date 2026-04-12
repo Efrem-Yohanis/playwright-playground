@@ -121,6 +121,9 @@ export async function createAudienceStandalone(payload: AudienceCreatePayload) {
   return handleResponse<ApiAudienceDetail>(res);
 }
 
+// Alias for backward compatibility
+export const createAudience = createAudienceStandalone;
+
 export async function updateAudienceFull(id: number, payload: AudienceCreatePayload) {
   const res = await authFetch(`${API_BASE}/api/audiences/${id}/`, {
     method: "PUT",
