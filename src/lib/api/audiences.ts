@@ -106,14 +106,27 @@ export async function deleteAudienceById(id: number) {
 
 export interface AudienceCreatePayload {
   campaign: number;
-  database_table: string;
-  id_field: string;
+  database_table?: string;
+  id_field?: string;
   filter_condition?: string;
+  recipients?: { msisdn: string; lang: string }[];
 }
 
-export async function createAudience(payload: AudienceCreatePayload) {
+export async function createAudienceStandalone(payload: AudienceCreatePayload) {
   const res = await authFetch(`${API_BASE}/api/audiences/`, {
     method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<ApiAudienceDetail>(res);
+}
+
+// Alias for backward compatibility
+export const createAudience = createAudienceStandalone;
+
+export async function updateAudienceFull(id: number, payload: AudienceCreatePayload) {
+  const res = await authFetch(`${API_BASE}/api/audiences/${id}/`, {
+    method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
